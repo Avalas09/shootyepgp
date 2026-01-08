@@ -939,7 +939,7 @@ end
 function sepgp:bidPrint(link,masterlooter,need,greed,bid)
   local mslink = string.gsub(bidlink["ms"],"$ML",masterlooter)
   local oslink = string.gsub(bidlink["os"],"$ML",masterlooter)
-  local msg = string.format(L["Click $MS, $OSNP or $OSP for %s"],link)
+  local msg = string.format(L["Click $MS or $OSNP for %s"],link)
   msg = string.gsub(msg, "$MS", mslink)
   msg = string.gsub(msg, "$OSNP", oslink)
   msg = string.gsub(msg, "$OSP", oslink)
