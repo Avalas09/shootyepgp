@@ -1,6 +1,6 @@
 -- /run sepgp.VARS.basegp = x   --punkty setup
 -- /run sepgp:gp_reset_v2()    -przeladowanie !robic backup przed!
-
+-- /console scriptErrors 1    --uruchamia konsole do ladowania bledow po tym /reload
 
 sepgp = AceLibrary("AceAddon-2.0"):new("AceConsole-2.0", "AceHook-2.1", "AceDB-2.0", "AceDebug-2.0", "AceEvent-2.0", "AceModuleCore-2.0", "FuBarPlugin-2.0")
 sepgp:SetModuleMixins("AceDebug-2.0")
