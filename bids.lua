@@ -143,24 +143,17 @@ function sepgp_bids:bidCountdown()
   self:ScheduleEvent("shootyepgpBidCountdownFinish",self.countdownFinish,6,self)
 end
 
-local pr_sorter_bids = function(a,b)
-	_, _, _, _, a_rank_idx, a_ep, a_pr = unpack(a)
-	_, _, _, _, b_rank_idx, b_ep, b_pr = unpack(b)
-	if a_rank_idx == b_rank_idx then
-		local a_over, b_over
-		if sepgp_minep > 0 then
-			a_over = a_ep >= sepgp_minep
-			b_over = b_ep >= sepgp_minep
-		end
-		if a_over == b_over then
-			return a_pr == b_pr and a_ep > b_ep or a_pr > b_pr
-		else
-			return a_over
-		end
-	else
-		return a_rank_idx < b_rank_idx
-	end
+local pr_sorter_bids = function(a, b)
+  local _, _, _, _, _, a_ep, a_pr = unpack(a)
+  local _, _, _, _, _, b_ep, b_pr = unpack(b)
 
+  -- najwyższe PR na górze
+  if a_pr ~= b_pr then
+    return a_pr > b_pr
+  end
+
+  -- jeśli PR równe, wyższe EP wyżej
+  return a_ep > b_ep
 end
 
 function sepgp_bids:OnTooltipUpdate()
