@@ -1,6 +1,6 @@
 -- /run sepgp.VARS.basegp = x   --punkty setup
 -- /run sepgp:gp_reset_v2()    -przeladowanie !robic backup przed!
--- Kalkulator zmiana wartosci 'powyzej gp' linijki 1393, 1394, 1397, 1465, 1466, 1469
+-- Kalkulator zmiana wartosci 'powyzej gp' linijki 1393, 1394, 1397, 1465, 1466, 1469 (+3)
 
 
 sepgp = AceLibrary("AceAddon-2.0"):new("AceConsole-2.0", "AceHook-2.1", "AceDB-2.0", "AceDebug-2.0", "AceEvent-2.0", "AceModuleCore-2.0", "FuBarPlugin-2.0")
@@ -1122,6 +1122,10 @@ function sepgp:shareSettings(force)
     local addonMsg = string.format("SETTINGS;%s:%s:%s:%s:%s:%s;1",sepgp_progress,sepgp_discount,sepgp_decay,sepgp_minep,tostring(sepgp_altspool),sepgp_altpercent)
     self:addonMessage(addonMsg,"GUILD")
   end
+end
+
+if not sepgp_bids then
+    sepgp_bids = {}
 end
 
 function sepgp:refreshPRTablets()
