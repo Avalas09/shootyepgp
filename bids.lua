@@ -156,20 +156,22 @@ local pr_sorter_bids = function(a, b)
   return a_ep > b_ep
 end
 
--- Dodaje gwiazdkę i kolor do Twojego nicku w liście bidów
 function sepgp_bids:OnTooltipUpdate()
   if not (sepgp.bid_item and sepgp.bid_item.link) then return end
+
   local link = sepgp.bid_item.link
   local itemName = sepgp.bid_item.name
-  local price = sepgp_prices:GetPrice(link,sepgp_progress)
+  local price = sepgp_prices:GetPrice(link, sepgp_progress)
   local offspec
+
   if not price then 
     price = "<n/a>"
     offspec = "<n/a>"
   else
-    offspec = math.floor(price*sepgp_discount)
+    offspec = math.floor(price * sepgp_discount)
   end
 
+  -- Kategorie dla itemu
   local bidcat = T:AddCategory(
       "columns", 3,    
       "text", C:Orange("Bid Item"), "child_textR", 1, "child_textG", 1, "child_textB", 1, "child_justify", "LEFT",
@@ -179,6 +181,7 @@ function sepgp_bids:OnTooltipUpdate()
   )
   bidcat:AddLine("text", itemName, "text2", price, "text3", offspec)
 
+  -- Kategorie dla licznika
   local countdownHeader = T:AddCategory(
       "columns", 2,
       "text","","child_textR", 1, "child_textG", 1, "child_textB", 1,"child_justify", "LEFT",
@@ -191,11 +194,13 @@ function sepgp_bids:OnTooltipUpdate()
       "func", "bidCountdown", "arg1", self
   )  
 
+  -- Nagłówek listy bidów
   local maincatHeader = T:AddCategory(
       "columns", 1,
       "text", C:Gold("Bids List")
-  ):AddLine("text","click to announce winner, ctrl+click to give loot, shift+click to give GP(tmog trade)")
+  ):AddLine("text", "click to announce winner, ctrl+click to give loot, shift+click to give GP(tmog trade)")
 
+  -- Kolumny listy
   local maincat = T:AddCategory(
       "columns", 5,
       "text",  C:Orange("Name"), "child_textR", 1, "child_textG", 1, "child_textB", 1, "child_justify", "LEFT",
@@ -206,8 +211,9 @@ function sepgp_bids:OnTooltipUpdate()
       "hideBlankLine", true
   )
 
-  -- Twój nick zawsze na górze
   local playerName = UnitName("player")
+
+  -- Sortowanie: Twój nick zawsze na górze, potem według PR i EP
   table.sort(sepgp.bids, function(a, b)
     local a_name, _, _, _, _, a_ep, a_pr = unpack(a)
     local b_name, _, _, _, _, b_ep, b_pr = unpack(b)
@@ -217,28 +223,30 @@ function sepgp_bids:OnTooltipUpdate()
     return a_ep > b_ep
   end)
 
-  -- Dodawanie linii do tabeli
-  for i = 1, #sepgp.bids do
+  -- Dodawanie bidów do listy
+  for i = 1, table.getn(sepgp.bids) do
     local name, class, rank, spec, r_idx, ep, pr, main = unpack(sepgp.bids[i])
     local namedesc
+
     if name == playerName then
-      namedesc = C:Gold("*" .. name)  -- gwiazdka i złoty kolor dla Twojego nicku
+      namedesc = C:Gold("*" .. name)  -- Gwiazdka i złoty kolor dla Twojego nicku
     else
       namedesc = C:Colorize(BC:GetHexColor(class), name)
     end
 
-    local text4 = (sepgp_minep > 0 and ep < sepgp_minep) and C:Red(string.format("%.4g", pr)) or string.format("%.4g", pr)
+    local text5 = (sepgp_minep > 0 and ep < sepgp_minep) and C:Red(string.format("%.4g", pr)) or string.format("%.4g", pr)
 
     maincat:AddLine(
       "text", namedesc,
       "text2", spec,
       "text3", rank,
       "text4", ep,
-      "text5", text4,
+      "text5", text5,
       "func", "on_bid_clicked", "arg1", self, "arg2", sepgp.bids[i]
     )
   end
 end
+
 
 
 -- GLOBALS: sepgp_saychannel,sepgp_groupbyclass,sepgp_groupbyarmor,sepgp_groupbyrole,sepgp_raidonly,sepgp_decay,sepgp_minep,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount,sepgp_log,sepgp_dbver,sepgp_looted
