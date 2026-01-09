@@ -1129,12 +1129,15 @@ if not sepgp_bids then
 end
 
 function sepgp:refreshPRTablets()
-  --if not T:IsAttached("sepgp_standings") then
-  sepgp_standings:Refresh()
-  --end
-  --if not T:IsAttached("sepgp_bids") then
-  sepgp_bids:Refresh()
-  --end
+  -- Odśwież standings, zawsze istnieje
+  if sepgp_standings and sepgp_standings.Refresh then
+      sepgp_standings:Refresh()
+  end
+
+  -- Odśwież bids tylko jeśli moduł istnieje i ma metodę Refresh
+  if sepgp_bids and sepgp_bids.Refresh then
+      sepgp_bids:Refresh()
+  end
 end
 
 ---------------------
@@ -1906,19 +1909,27 @@ function sepgp:captureBid(text, sender)
 end
 
 function sepgp:clearBids(reset)
-  if reset~=nil then
+  if reset ~= nil then
     self:debugPrint(L["Clearing old Bids"])
   end
+
   sepgp.bid_item = {}
   sepgp.bids = {}
   bids_blacklist = {}
+  running_bid = false
+
+
   if self:IsEventScheduled("shootyepgpBidTimeout") then
     self:CancelScheduledEvent("shootyepgpBidTimeout")
   end
-  running_bid = false
-  sepgp_bids._counterText = ""
-  sepgp_bids:Refresh()
+
+  -- Reset licznika i odśwież okno bids, jeśli moduł istnieje
+  if sepgp_bids and sepgp_bids.Refresh then
+    sepgp_bids._counterText = ""
+    sepgp_bids:Refresh()
+  end
 end
+
 
 ----------------
 -- Loot Tracker
