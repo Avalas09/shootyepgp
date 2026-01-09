@@ -115,7 +115,7 @@ function sepgp_bids:on_bid_clicked(bid)
 end
 
 function sepgp_bids:countdownCounter()
-  self._counter = (self._counter or 6) - 1
+  self._counter = (self._counter or 4) - 1
   if GetNumRaidMembers()>0 and self._counter > 0 then
     self._counterText = C:Yellow(tostring(self._counter))
     sepgp:widestAudience(tostring(self._counter))
@@ -128,7 +128,7 @@ function sepgp_bids:countdownFinish(reset)
   if self:IsEventScheduled("shootyepgpBidCountdown") then
     self:CancelScheduledEvent("shootyepgpBidCountdown")
   end
-  self._counter = 6
+  self._counter = 4
   if (reset) then
     self._counterText = C:Green("Starting")
   else
