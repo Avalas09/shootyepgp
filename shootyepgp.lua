@@ -1,6 +1,7 @@
 -- /run sepgp.VARS.basegp = x   --punkty setup
 -- /run sepgp:gp_reset_v2()    -przeladowanie !robic backup przed!
--- /console scriptErrors 1    --uruchamia konsole do ladowania bledow po tym /reload
+-- Kalkulator zmiana wartosci 'powyzej gp' linijki 1393, 1394, 1397, 1465, 1466, 1469
+
 
 sepgp = AceLibrary("AceAddon-2.0"):new("AceConsole-2.0", "AceHook-2.1", "AceDB-2.0", "AceDebug-2.0", "AceEvent-2.0", "AceModuleCore-2.0", "FuBarPlugin-2.0")
 sepgp:SetModuleMixins("AceDebug-2.0")
@@ -1389,11 +1390,11 @@ function sepgp:decay_epgp_v3()
 
       -- GP: decay tylko powyżej 1000
       local gpDecayBase = 0
-      if gp > 1000 then
-        gpDecayBase = gp - 1000
+      if gp > 100 then
+        gpDecayBase = gp - 100
       end
 
-      local gpAfterDecay = 1000 + self:num_round(gpDecayBase * sepgp_decay)
+      local gpAfterDecay = 100 + self:num_round(gpDecayBase * sepgp_decay)
       gpAfterDecay = math.max(sepgp.VARS.basegp, gpAfterDecay)
 
       self:update_epgp_v3(ep, gpAfterDecay, i, name, officernote)
@@ -1461,11 +1462,11 @@ function sepgp:capcalc(ep, gp, gain)
 
   -- GP: decay tylko powyżej 1000
   local gpDecayBase = 0
-  if gp > 1000 then
-    gpDecayBase = gp - 1000
+  if gp > 100 then
+    gpDecayBase = gp - 100
   end
 
-  local gp_decayed = 1000 + self:num_round(gpDecayBase * sepgp_decay)
+  local gp_decayed = 100 + self:num_round(gpDecayBase * sepgp_decay)
   gp_decayed = math.max(sepgp.VARS.basegp, gp_decayed)
 
   local pr_decay =
