@@ -9,7 +9,7 @@ sepgp_bids = sepgp:NewModule("sepgp_bids", "AceDB-2.0", "AceEvent-2.0")
 
 function sepgp_bids:OnEnable()
   if not T:IsRegistered("sepgp_bids") then
-    T:Register("sepgp_bids",
+    T:Register("sepgp_bids"),
       "children", function()
         T:SetTitle(L["shootyepgp bids"])
         self:OnTooltipUpdate()
