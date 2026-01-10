@@ -3,6 +3,7 @@ local L = AceLibrary("AceLocale-2.2"):new("shootyepgp")
 L:RegisterTranslations("enUS", function() return {
   --["Term"] = true, -- Example
   -- common
+  ["Click $MS or $OSNP for %s"] = true,
   ["Refresh"] = true,
   ["Refresh window"] = true,
   ["Clear"] = true,

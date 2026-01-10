@@ -3,16 +3,77 @@
 -- Kalkulator zmiana wartosci 'powyzej gp' linijki 1393, 1394, 1397, 1465, 1466, 1469 (+3)
 
 
-sepgp = AceLibrary("AceAddon-2.0"):new("AceConsole-2.0", "AceHook-2.1", "AceDB-2.0", "AceDebug-2.0", "AceEvent-2.0", "AceModuleCore-2.0", "FuBarPlugin-2.0")
+sepgp = AceLibrary("AceAddon-2.0"):new(
+  "AceConsole-2.0",
+  "AceHook-2.1",
+  "AceDB-2.0",
+  "AceDebug-2.0",
+  "AceEvent-2.0",
+  "AceModuleCore-2.0",
+  "FuBarPlugin-2.0"
+)
+
 sepgp:SetModuleMixins("AceDebug-2.0")
-local D = AceLibrary("Dewdrop-2.0")
+
+local D  = AceLibrary("Dewdrop-2.0")
 local BZ = AceLibrary("Babble-Zone-2.2")
-local C = AceLibrary("Crayon-2.0")
+local C  = AceLibrary("Crayon-2.0")
 local BC = AceLibrary("Babble-Class-2.2")
 local DF = AceLibrary("Deformat-2.0")
-local G = AceLibrary("Gratuity-2.0")
-local T = AceLibrary("Tablet-2.0")
-local L = AceLibrary("AceLocale-2.2"):new("shootyepgp")
+local G  = AceLibrary("Gratuity-2.0")
+local T  = AceLibrary("Tablet-2.0")
+local L  = AceLibrary("AceLocale-2.2"):new("shootyepgp")
+
+-- =========================
+-- BIDDING CONTROL (STEP 2)
+-- =========================
+function sepgp:beginBidding(itemLink, itemLinkFull, itemName)
+DEFAULT_CHAT_FRAME:AddMessage("BEGIN BIDDING FIRED")
+  if self.startBids then
+    self:startBids(itemLink, itemLinkFull, itemName)
+  end
+end
+
+-- =========================
+-- SAFE BIDS FRAME API
+-- =========================
+function sepgp:showBidsFrame()
+  if sepgp_bids_frame then
+    sepgp_bids_frame:Show()
+    sepgp_bids_frame:Refresh()
+  end
+end
+
+-- SAFE FRAME ACCESS
+function sepgp:showBidsFrame()
+  if sepgp_bids_frame then
+    sepgp_bids_frame:Show()
+    sepgp_bids_frame:Refresh()
+  end
+end
+
+-- =========================
+-- SAFE UI ACCESS HELPERS
+-- =========================
+
+function sepgp:safeToggle(module, force)
+  if module and module.Toggle then
+    module:Toggle(force)
+  end
+end
+
+function sepgp:safeRefresh(module)
+  if module and module.Refresh then
+    module:Refresh()
+  end
+end
+
+function sepgp:safeSet(module, key, value)
+  if module then
+    module[key] = value
+  end
+end
+
 sepgp.VARS = {
   basegp = 100,
   minep = 0,
@@ -68,7 +129,7 @@ local admincmd, membercmd = {type = "group", handler = sepgp, args = {
       name = L["Bids"],
       desc = L["Show Bids Table."],
       func = function()
-        sepgp_bids:Toggle()
+        self:safeToggle(sepgp_bids)
       end,
       order = 1,
     },
@@ -517,7 +578,8 @@ function sepgp:OnEnable() -- PLAYER_LOGIN (2)
   self:RegisterEvent("CHAT_MSG_RAID","captureLootCall")
   self:RegisterEvent("CHAT_MSG_RAID_LEADER","captureLootCall")
   self:RegisterEvent("CHAT_MSG_RAID_WARNING","captureLootCall")
-  self:RegisterEvent("CHAT_MSG_WHISPER","captureBid")
+--self:RegisterEvent("CHAT_MSG_WHISPER","captureBid")
+  self:RegisterEvent("CHAT_MSG_ADDON", "captureAddonBid")
   self:RegisterEvent("CHAT_MSG_LOOT","captureLoot")
   self:RegisterEvent("TRADE_PLAYER_ITEM_CHANGED","tradeLoot")
   self:RegisterEvent("TRADE_ACCEPT_UPDATE","tradeLoot")
@@ -796,31 +858,39 @@ function sepgp:GuildRosterSetOfficerNote(index,note,fromAddon)
   end
 end
 
+print("SetItemRef fired:", link)
 function sepgp:SetItemRef(link, name, button)
-  if string.sub(link,1,9) == "shootybid" then
-    local _,_,bid,masterlooter = string.find(link,"shootybid:(%d+):(%w+)")
-    if bid == "1" then
-      bid = "+"
-    elseif bid == "2" then
-      bid = "-"
-    elseif bid == "3" then
-      bid = "-"
+  print("SetItemRef fired:", link)
+
+  -- =========================
+  -- NOWA LOGIKA BID�W (AddonMessage � VANILLA SAFE)
+  -- =========================
+  if string.sub(link, 1, 9) == "shootybid" then
+    local _, _, bidType = string.find(link, "shootybid:(%d+)")
+
+    local msg
+    if bidType == "1" then
+      msg = "MS"
+    elseif bidType == "2" or bidType == "3" then
+      msg = "OS"
     else
-      bid = nil
+      return
     end
-    if not self:inRaid(masterlooter) then
-      masterlooter = nil
-    end
-    if (bid and masterlooter) then
-      SendChatMessage(bid,"WHISPER",nil,masterlooter)
-    end
+
+    -- VANILLA SAFE
+    SendAddonMessage("SEPGP_BID", msg, "RAID")
     return
   end
+
+  -- =========================
+  -- NORMALNE ZACHOWANIE LINK�W
+  -- =========================
   self.hooks["SetItemRef"](link, name, button)
+
   if (link and name and ItemRefTooltip) then
     if (strsub(link, 1, 4) == "item") then
-      if (ItemRefTooltip:IsVisible()) then
-        if (not DressUpFrame:IsVisible()) then
+      if ItemRefTooltip:IsVisible() then
+        if not DressUpFrame:IsVisible() then
           self:AddDataToTooltip(ItemRefTooltip, link)
         end
         ItemRefTooltip.isDisplayDone = nil
@@ -941,36 +1011,29 @@ function sepgp:defaultPrint(msg)
   DEFAULT_CHAT_FRAME:AddMessage(string.format(out,msg))
 end
 
-function sepgp:bidPrint(link,masterlooter,need,greed,bid)
-  local mslink = string.gsub(bidlink["ms"],"$ML",masterlooter)
-  local oslink = string.gsub(bidlink["os"],"$ML",masterlooter)
-  local msg = string.format(L["Click $MS or $OSNP for %s"],link)
-  msg = string.gsub(msg, "$MS", mslink)
-  msg = string.gsub(msg, "$OSNP", oslink)
-  msg = string.gsub(msg, "$OSP", oslink)
-  msg = string.gsub(msg, "$OS", oslink)
-  if (need and greed) then
-  elseif (need) then
-    msg = string.gsub(msg,L["or $OS "],"")
-  elseif (greed) then
-    msg = string.gsub(msg,L["$MS or "],"")
-  elseif (bid) then
-  end
-  local _, count = string.gsub(msg,"%$","%$")
-  if (count > 0) then return end
-  local chatframe
-  if (SELECTED_CHAT_FRAME) then
-    chatframe = SELECTED_CHAT_FRAME
-  else
-    if not DEFAULT_CHAT_FRAME:IsVisible() then
-      FCF_SelectDockFrame(DEFAULT_CHAT_FRAME)
-    end
-    chatframe = DEFAULT_CHAT_FRAME
-  end
-  if (chatframe) then
-    chatframe:AddMessage(" ")
-    chatframe:AddMessage(string.format(out,msg),NORMAL_FONT_COLOR.r,NORMAL_FONT_COLOR.g,NORMAL_FONT_COLOR.b)
-  end
+function sepgp:bidPrint(link, masterlooter)
+  if not masterlooter then return end
+
+  local mslink = string.format(
+    "|cff00ff00|Hshootybid:1:%s|h[Mainspec]|h|r",
+    masterlooter
+  )
+
+  local oslink = string.format(
+    "|cff3399ff|Hshootybid:2:%s|h[Offspec]|h|r",
+    masterlooter
+  )
+
+  local msg = string.format(
+    "Click %s or %s for %s",
+    mslink,
+    oslink,
+    link
+  )
+
+  local chatframe = SELECTED_CHAT_FRAME or DEFAULT_CHAT_FRAME
+  chatframe:AddMessage(" ")
+  chatframe:AddMessage(msg)
 end
 
 function sepgp:simpleSay(msg)
@@ -1124,10 +1187,6 @@ function sepgp:shareSettings(force)
   end
 end
 
-if not sepgp_bids then
-    sepgp_bids = {}
-end
-
 function sepgp:refreshPRTablets()
   -- Odśwież standings, zawsze istnieje
   if sepgp_standings and sepgp_standings.Refresh then
@@ -1136,7 +1195,7 @@ function sepgp:refreshPRTablets()
 
   -- Odśwież bids tylko jeśli moduł istnieje i ma metodę Refresh
   if sepgp_bids and sepgp_bids.Refresh then
-      sepgp_bids:Refresh()
+      self:safeRefresh(sepgp_bids)
   end
 end
 
@@ -1543,20 +1602,39 @@ end
 
 function sepgp:OnClick()
   local is_admin = admin()
+
   if (IsControlKeyDown() and IsShiftKeyDown() and is_admin) then
-    sepgp_logs:Toggle()
+    if sepgp_logs and sepgp_logs.Toggle then
+      sepgp_logs:Toggle()
+    end
+
   elseif (IsControlKeyDown() and IsAltKeyDown() and is_admin) then
-    sepgp_alts:Toggle()
+    if sepgp_alts and sepgp_alts.Toggle then
+      sepgp_alts:Toggle()
+    end
+
   elseif (IsControlKeyDown() and is_admin) then
-    sepgp_reserves:Toggle()
+    if sepgp_reserves and sepgp_reserves.Toggle then
+      sepgp_reserves:Toggle()
+    end
+
   elseif (IsShiftKeyDown() and is_admin) then
-    sepgp_loot:Toggle()      
+    if sepgp_loot and sepgp_loot.Toggle then
+      sepgp_loot:Toggle()
+    end
+
   elseif (IsAltKeyDown() and is_admin) then
-    sepgp_bids:Toggle()
+    if sepgp_bids and sepgp_bids.Toggle then
+      self:safeToggle(sepgp_bids)
+    end
+
   else
-    sepgp_standings:Toggle()
+    if sepgp_standings and sepgp_standings.Toggle then
+      sepgp_standings:Toggle()
+    end
   end
 end
+
 
 function sepgp:SetRefresh(flag)
   needRefresh = flag
@@ -1811,125 +1889,213 @@ lootCall.os = {
 lootCall.bs = { -- blacklist
   "^(roll)[%s%p%c]+.+",".+[%s%p%c]+(roll)$",".*[%s%p%c]+(roll)[%s%p%c]+.*"
 }
+
 function sepgp:captureLootCall(text, sender)
-  if not (string.find(text, "|Hitem:", 1, true)) then return end
-  local linkstriptext, count = string.gsub(text,"|c%x+|H[eimt:%d]+|h%[[%w%s',%-]+%]|h|r"," ; ")
+  if not string.find(text, "|Hitem:", 1, true) then return end
+
+  local linkstriptext, count = string.gsub(
+    text,
+    "|c%x+|H[eimt:%d]+|h%[[%w%s',%-]+%]|h|r",
+    " ; "
+  )
   if count > 1 then return end
+
   local lowtext = string.lower(linkstriptext)
-  local whisperkw_found, mskw_found, oskw_found, link_found, blacklist_found
-  for _,f in ipairs(lootCall.bs) do
-    blacklist_found = string.find(lowtext,f)
-    if (blacklist_found) then return end
-  end
-  local _, itemLink, itemColor, itemString, itemName
-  for _,f in ipairs(lootCall.whisp) do
-    whisperkw_found = string.find(lowtext,f)
-    if (whisperkw_found) then break end
-  end
-  for _,f in ipairs(lootCall.ms) do
-    mskw_found = string.find(lowtext,f)
-    if (mskw_found) then break end
-  end
-  for _,f in ipairs(lootCall.os) do
-    oskw_found = string.find(lowtext,f)
-    if (oskw_found) then break end
-  end
-  if (whisperkw_found) or (mskw_found) or (oskw_found) then
-    _,_,itemLink = string.find(text,"(|c%x+|H[eimt:%d]+|h%[[%w%s',%-]+%]|h|r)")
-    if (itemLink) and (itemLink ~= "") then
-      link_found, _, itemColor, itemString, itemName = string.find(itemLink, "^(|c%x+)|H(.+)|h(%[.+%])")
-    end
-    if (link_found) then
-      local quality = hexColorQuality[itemColor] or -1
-      if (quality >= 3) then
-        if (IsRaidLeader() or self:lootMaster()) and (sender == self._playerName) then
-          self:clearBids(true)
-          sepgp.bid_item.link = itemString
-          sepgp.bid_item.linkFull = itemLink
-          sepgp.bid_item.name = string.format("%s%s|r",itemColor,itemName)
-          self:ScheduleEvent("shootyepgpBidTimeout",self.clearBids,300,self)
-          running_bid = true
-          self:debugPrint("Capturing Bids for 5min.")
-          sepgp_bids:Toggle(true)
-        end
-        self:bidPrint(itemLink,sender,mskw_found,oskw_found,whisperkw_found)
-      end
+
+  -- blacklist
+  for _, f in ipairs(lootCall.bs) do
+    if string.find(lowtext, f) then
+      return
     end
   end
+
+  local whisperkw_found, mskw_found, oskw_found
+  for _, f in ipairs(lootCall.whisp) do
+    if string.find(lowtext, f) then whisperkw_found = true break end
+  end
+  for _, f in ipairs(lootCall.ms) do
+    if string.find(lowtext, f) then mskw_found = true break end
+  end
+  for _, f in ipairs(lootCall.os) do
+    if string.find(lowtext, f) then oskw_found = true break end
+  end
+
+  if not (whisperkw_found or mskw_found or oskw_found) then return end
+
+  -- VANILLA SAFE itemLink extraction
+  local _, _, itemLink = string.find(
+    text,
+    "(|c%x+|H[eimt:%d]+|h%[[%w%s',%-]+%]|h|r)"
+  )
+  if not itemLink then return end
+
+  -- VANILLA SAFE split of item link (NO string.match)
+  local _, _, itemColor, itemString, itemName = string.find(
+    itemLink,
+    "^(|c%x+)|H(.+)|h(%[.+%])"
+  )
+  if not itemColor then return end
+
+  local quality = hexColorQuality[itemColor] or -1
+  if quality < 3 then return end
+
+  -- 🔥 START BIDDING (ONLY ML)
+  if (IsRaidLeader() or self:lootMaster()) and sender == self._playerName then
+--    self:beginBidding(
+--      itemString,
+--      itemLink,
+--      string.format("%s%s|r", itemColor, itemName)
+--    )
+  end
+
+  -- print clickable MS / OS links for everyone
+  self:bidPrint(itemLink, sender, mskw_found, oskw_found, whisperkw_found)
 end
 
 local lootBid = {}
 lootBid.ms = {"(%+)",".+(%+).*",".*(%+).+",".*(%+).*","(ms)","(need)"}
 lootBid.os = {"(%-)",".+(%-).*",".*(%-).+",".*(%-).*","(os)","(greed)"}
+
 function sepgp:captureBid(text, sender)
-  if not (running_bid) then return end
+  if not running_bid then return end
   if not (IsRaidLeader() or self:lootMaster()) then return end
-  if not sepgp.bid_item.link then return end
-  local mskw_found,oskw_found
+  if not sepgp.bid_item or not sepgp.bid_item.link then return end
+
+  local mskw_found, oskw_found
   local lowtext = string.lower(text)
-  for _,f in ipairs(lootBid.ms) do
-    mskw_found = string.find(text,f)
-    if (mskw_found) then break end
+
+  for _, f in ipairs(lootBid.ms) do
+    mskw_found = string.find(lowtext, f)
+    if mskw_found then break end
   end
-  for _,f in ipairs(lootBid.os) do
-    oskw_found = string.find(text,f)
-    if (oskw_found) then break end
+
+  for _, f in ipairs(lootBid.os) do
+    oskw_found = string.find(lowtext, f)
+    if oskw_found then break end
   end
-  if (mskw_found) or (oskw_found) then
-    if self:inRaid(sender) then
-      if bids_blacklist[sender] == nil then
-        for i = 1, GetNumGuildMembers(1) do
-          -- local name, rank_name, rank_idx, lvl, class, location, note, officernote, online, _ = GetGuildRosterInfo(i)
-          local name, rank, _, _, class, _, note, officernote, _, _ = GetGuildRosterInfo(i)
-          if name == sender then
-						rank = self:parseRank(name,officernote) or rank
-						spec = mskw_found and 'MS' or 'OS'
-						rank_idx = sepgp:rankPrio_index(rank, spec) or 1000
-            local ep = (self:get_ep_v3(name,officernote) or 0) 
-            local gp = (self:get_gp_v3(name,officernote) or sepgp.VARS.basegp)
-            local main_name
-            if (sepgp_altspool) then
-              local main, main_class, main_rank, main_offnote = self:parseAlt(name,officernote)
-              if (main) then
-                ep = (self:get_ep_v3(main,main_offnote) or 0)
-                gp = (self:get_gp_v3(main,main_offnote) or sepgp.VARS.basegp)
-                main_name = main
-              end
-            end
-						bids_blacklist[sender] = true
-						--table.insert(sepgp.bids,{name,class,rank,spec,rank_idx,ep,(ep/gp),main_name})
-            table.insert(sepgp.bids,{name,class,rank,spec,rank_idx,ep,(ep/gp),ep,main_name})
-            sepgp_bids:Toggle(true)
-            return
-          end
+
+  if not (mskw_found or oskw_found) then return end
+  if not self:inRaid(sender) then return end
+  if bids_blacklist[sender] then return end
+
+  for i = 1, GetNumGuildMembers(1) do
+    local name, rank, _, _, class, _, note, officernote = GetGuildRosterInfo(i)
+    if name == sender then
+      rank = self:parseRank(name, officernote) or rank
+      local spec = mskw_found and "MS" or "OS"
+      local rank_idx = self:rankPrio_index(rank, spec) or 1000
+
+      local ep = self:get_ep_v3(name, officernote) or 0
+      local gp = self:get_gp_v3(name, officernote) or sepgp.VARS.basegp
+      local main_name
+
+      if sepgp_altspool then
+        local main, _, _, main_offnote = self:parseAlt(name, officernote)
+        if main then
+          ep = self:get_ep_v3(main, main_offnote) or 0
+          gp = self:get_gp_v3(main, main_offnote) or sepgp.VARS.basegp
+          main_name = main
         end
       end
+
+      bids_blacklist[sender] = true
+		table.insert(sepgp.bids, {name, class, rank, spec, rank_idx, ep, (ep / gp), ep, main_name})
+
+      return
     end
   end
 end
 
-function sepgp:clearBids(reset)
-  if reset ~= nil then
-    self:debugPrint(L["Clearing old Bids"])
+function sepgp:captureAddonBid(prefix, message, channel, sender)
+  print(">>> captureAddonBid HIT", prefix, message, channel, sender)
+
+  if prefix ~= "SEPGP_BID" then return end
+  if not running_bid then return end
+  if not (IsRaidLeader() or self:lootMaster()) then return end
+  if not self:inRaid(sender) then return end
+  if bids_blacklist[sender] then return end
+
+  local spec
+  if message == "MS" then
+    spec = "MS"
+  elseif message == "OS" then
+    spec = "OS"
+  else
+    return
   end
 
-  sepgp.bid_item = {}
-  sepgp.bids = {}
-  bids_blacklist = {}
-  running_bid = false
-
-
-  if self:IsEventScheduled("shootyepgpBidTimeout") then
-    self:CancelScheduledEvent("shootyepgpBidTimeout")
-  end
-
-  -- Reset licznika i odśwież okno bids, jeśli moduł istnieje
-  if sepgp_bids and sepgp_bids.Refresh then
-    sepgp_bids._counterText = ""
-    sepgp_bids:Refresh()
-  end
+  -- TERAZ r�cznie dodajemy bid (BEZ whisper�w)
+  self:captureBid(spec, sender)
 end
 
+function sepgp:captureAddonBid(event, prefix, message, channel, sender)
+  if prefix ~= "SEPGP_BID" then return end
+  if not running_bid then return end
+
+  -- tylko Master Looter
+  if not (IsRaidLeader() or self:lootMaster()) then return end
+
+  if not self:inRaid(sender) then return end
+  if bids_blacklist[sender] then return end
+
+  local spec
+  if message == "MS" then
+    spec = "MS"
+  elseif message == "OS" then
+    spec = "OS"
+  else
+    return
+  end
+
+  -- dodaj bid
+  self:captureBid(spec, sender)
+
+  -- poka� / od�wie� okno bid�w
+  self:showBidsFrame()
+end
+
+-- =========================
+-- AWARD LOOT + GP FROM BIDS
+-- =========================
+function sepgp:awardLootToBid(bid)
+  if not bid then return end
+  if not sepgp.bid_item or not sepgp.bid_item.linkFull then return end
+  if not (IsRaidLeader() or self:lootMaster()) then return end
+
+  local name = bid[1]
+
+  -- Find loot slot
+  local lootSlot
+  for i = 1, GetNumLootItems() do
+    local _, lootName = GetLootSlotInfo(i)
+    if lootName and string.find(sepgp.bid_item.linkFull, lootName, 1, true) then
+      lootSlot = i
+      break
+    end
+  end
+  if not lootSlot then return end
+
+  -- Find raid index
+  local raidIndex
+  for i = 1, 40 do
+    if GetMasterLootCandidate(i) == name then
+      raidIndex = i
+      break
+    end
+  end
+  if not raidIndex then return end
+
+  -- Give loot
+  GiveMasterLoot(lootSlot, raidIndex)
+
+  -- Charge GP using prices.lua (MS/OS respected)
+  self:processLoot(name, sepgp.bid_item.linkFull, "bids")
+
+  -- Clear bids
+  if self.clearBids then
+    self:clearBids(true)
+  end
+end
 
 ----------------
 -- Loot Tracker
@@ -2488,6 +2654,36 @@ function sepgp:EasyMenu(menuList, menuFrame, anchor, x, y, displayMode, level)
   end
   UIDropDownMenu_Initialize(menuFrame, function() sepgp:EasyMenu_Initialize(level, menuList) end, displayMode, level)
   ToggleDropDownMenu(1, nil, menuFrame, anchor, x, y)
+end
+
+-- === Force Self to be first Master Loot recipient ===
+do
+  local original_AddButton = UIDropDownMenu_AddButton
+
+  UIDropDownMenu_AddButton = function(info, level)
+    if level == 2
+       and UIDROPDOWNMENU_MENU_VALUE
+       and type(UIDROPDOWNMENU_MENU_VALUE) == "number"
+       and info
+       and info.text
+    then
+      local playerName = UnitName("player")
+
+      -- Jeśli to Self → dodaj natychmiast
+      if info.text == playerName then
+        original_AddButton(info, level)
+        return
+      end
+
+      -- Resztę opóźnij o jedną klatkę
+      C_Timer.After(0, function()
+        original_AddButton(info, level)
+      end)
+      return
+    end
+
+    original_AddButton(info, level)
+  end
 end
 
 -- GLOBALS: sepgp_saychannel,sepgp_groupbyclass,sepgp_groupbyarmor,sepgp_groupbyrole,sepgp_raidonly,sepgp_decay,sepgp_minep,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount,sepgp_altspool,sepgp_altpercent,sepgp_log,sepgp_dbver,sepgp_looted,sepgp_debug,sepgp_fubar
