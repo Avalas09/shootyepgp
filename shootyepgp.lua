@@ -533,6 +533,9 @@ function sepgp:OnInitialize() -- ADDON_LOADED (1) unless LoD
 end
 
 function sepgp:OnEnable() -- PLAYER_LOGIN (2)
+	if RegisterAddonMessagePrefix then
+		RegisterAddonMessagePrefix("SEPGP_BID")
+	end
   --table.insert(sepgp_debug,{[date("%b/%d %H:%M:%S")]="OnEnable"})
   sepgp._playerLevel = UnitLevel("player")
   sepgp.extratip = (sepgp.extratip) or CreateFrame("GameTooltip","shootyepgp_tooltip",UIParent,"GameTooltipTemplate")
@@ -578,7 +581,6 @@ function sepgp:OnEnable() -- PLAYER_LOGIN (2)
   self:RegisterEvent("CHAT_MSG_RAID","captureLootCall")
   self:RegisterEvent("CHAT_MSG_RAID_LEADER","captureLootCall")
   self:RegisterEvent("CHAT_MSG_RAID_WARNING","captureLootCall")
---self:RegisterEvent("CHAT_MSG_WHISPER","captureBid")
   self:RegisterEvent("CHAT_MSG_ADDON", "captureAddonBid")
   self:RegisterEvent("CHAT_MSG_LOOT","captureLoot")
   self:RegisterEvent("TRADE_PLAYER_ITEM_CHANGED","tradeLoot")
@@ -632,9 +634,10 @@ function sepgp:AceEvent_FullyInitialized() -- SYNTHETIC EVENT, later than PLAYER
   -- hook GiveMasterLoot to catch loot assign to members too far for chat parsing
   self:SecureHook("GiveMasterLoot")
   -- hook SetItemRef to parse our client bid links
-  self:Hook("SetItemRef")
+  --self:Hook("SetItemRef")
   -- hook tooltip to add our GP values
   self:TipHook()
+  self:SecureHook(ItemRefTooltip, "SetHyperlink", "OnItemRefSetHyperlink")
   -- hook LootFrameItem_OnClick to add our own click handlers for bid calls
   self:SecureHook("LootFrameItem_OnClick")
   -- hook ContainerFrameItemButton_OnClick to add our own click handlers for bid calls
@@ -858,46 +861,7 @@ function sepgp:GuildRosterSetOfficerNote(index,note,fromAddon)
   end
 end
 
-print("SetItemRef fired:", link)
-function sepgp:SetItemRef(link, name, button)
-  print("SetItemRef fired:", link)
 
-  -- =========================
-  -- NOWA LOGIKA BIDÓW (AddonMessage – VANILLA SAFE)
-  -- =========================
-  if string.sub(link, 1, 9) == "shootybid" then
-    local _, _, bidType = string.find(link, "shootybid:(%d+)")
-
-    local msg
-    if bidType == "1" then
-      msg = "MS"
-    elseif bidType == "2" or bidType == "3" then
-      msg = "OS"
-    else
-      return
-    end
-
-    -- VANILLA SAFE
-    SendAddonMessage("SEPGP_BID", msg, "RAID")
-    return
-  end
-
-  -- =========================
-  -- NORMALNE ZACHOWANIE LINKÓW
-  -- =========================
-  self.hooks["SetItemRef"](link, name, button)
-
-  if (link and name and ItemRefTooltip) then
-    if (strsub(link, 1, 4) == "item") then
-      if ItemRefTooltip:IsVisible() then
-        if not DressUpFrame:IsVisible() then
-          self:AddDataToTooltip(ItemRefTooltip, link)
-        end
-        ItemRefTooltip.isDisplayDone = nil
-      end
-    end
-  end
-end
 
 function sepgp:LootFrameItem_OnClick(button,data)
   if not IsAltKeyDown() then return end
@@ -931,6 +895,7 @@ function sepgp:LootFrameItem_OnClick(button,data)
     end
   end
 end
+
 
 function sepgp:ContainerFrameItemButton_OnClick(button,ignoreModifiers)
   if not IsAltKeyDown() then 
@@ -1014,20 +979,8 @@ end
 function sepgp:bidPrint(link, masterlooter)
   if not masterlooter then return end
 
-  local mslink = string.format(
-    "|cff00ff00|Hshootybid:1:%s|h[Mainspec]|h|r",
-    masterlooter
-  )
-
-  local oslink = string.format(
-    "|cff3399ff|Hshootybid:2:%s|h[Offspec]|h|r",
-    masterlooter
-  )
-
   local msg = string.format(
-    "Click %s or %s for %s",
-    mslink,
-    oslink,
+    "Type MS or OS for %s",
     link
   )
 
@@ -1941,11 +1894,11 @@ function sepgp:captureLootCall(text, sender)
 
   -- ðŸ”¥ START BIDDING (ONLY ML)
   if (IsRaidLeader() or self:lootMaster()) and sender == self._playerName then
---    self:beginBidding(
---      itemString,
---      itemLink,
---      string.format("%s%s|r", itemColor, itemName)
---    )
+    self:beginBidding(
+      itemString,
+      itemLink,
+      string.format("%s%s|r", itemColor, itemName)
+    )
   end
 
   -- print clickable MS / OS links for everyone
@@ -2004,54 +1957,6 @@ function sepgp:captureBid(text, sender)
       return
     end
   end
-end
-
-function sepgp:captureAddonBid(prefix, message, channel, sender)
-  print(">>> captureAddonBid HIT", prefix, message, channel, sender)
-
-  if prefix ~= "SEPGP_BID" then return end
-  if not running_bid then return end
-  if not (IsRaidLeader() or self:lootMaster()) then return end
-  if not self:inRaid(sender) then return end
-  if bids_blacklist[sender] then return end
-
-  local spec
-  if message == "MS" then
-    spec = "MS"
-  elseif message == "OS" then
-    spec = "OS"
-  else
-    return
-  end
-
-  -- TERAZ rêcznie dodajemy bid (BEZ whisperów)
-  self:captureBid(spec, sender)
-end
-
-function sepgp:captureAddonBid(event, prefix, message, channel, sender)
-  if prefix ~= "SEPGP_BID" then return end
-  if not running_bid then return end
-
-  -- tylko Master Looter
-  if not (IsRaidLeader() or self:lootMaster()) then return end
-
-  if not self:inRaid(sender) then return end
-  if bids_blacklist[sender] then return end
-
-  local spec
-  if message == "MS" then
-    spec = "MS"
-  elseif message == "OS" then
-    spec = "OS"
-  else
-    return
-  end
-
-  -- dodaj bid
-  self:captureBid(spec, sender)
-
-  -- poka¿ / odœwie¿ okno bidów
-  self:showBidsFrame()
 end
 
 -- =========================
@@ -2685,6 +2590,142 @@ do
     original_AddButton(info, level)
   end
 end
+
+-- =========================================================
+-- SAFE TURTLE WOW BIDDING (AddonMessage + Clickable Links)
+-- =========================================================
+
+-- FORCE BID STATE (TEST MODE)
+local function sepgp_forceStartBids()
+  running_bid = true
+  bids_blacklist = {}
+  sepgp.bids = {}
+end
+
+-- OVERRIDE bidPrint (no whisper, clickable only)
+function sepgp:bidPrint(link, masterlooter)
+  if not masterlooter then return end
+
+  sepgp_forceStartBids()
+
+  local mslink = string.format(
+    "|cff00ff00|Hshootybid:1|h[Mainspec]|h|r"
+  )
+
+  local oslink = string.format(
+    "|cff3399ff|Hshootybid:2|h[Offspec]|h|r"
+  )
+
+  local msg = string.format(
+    "Click %s or %s for %s",
+    mslink,
+    oslink,
+    link
+  )
+
+  local chatframe = SELECTED_CHAT_FRAME or DEFAULT_CHAT_FRAME
+  chatframe:AddMessage(" ")
+  chatframe:AddMessage(msg)
+end
+
+-- HANDLE CLICK ON MS / OS
+function sepgp:SetItemRef(link, text, button)
+  print(">>> SetItemRef CALLED:", link)
+
+  if link and string.find(link, "shootybid") then
+    local bidType
+    local parts = {}
+
+    for part in string.gfind(link, "[^:]+") do
+      table.insert(parts, part)
+    end
+
+    bidType = parts[2]
+    print(">>> BID TYPE:", bidType)
+
+    if not bidType then return end
+
+    local msg
+    if bidType == "1" then
+      msg = "MS"
+    elseif bidType == "2" then
+      msg = "OS"
+    else
+      return
+    end
+
+    print(">>> BID CLICK:", msg)
+
+    if GetNumRaidMembers() > 0 then
+      SendAddonMessage("SEPGP_BID", msg, "RAID")
+    else
+      SendAddonMessage("SEPGP_BID", msg, "PARTY")
+    end
+
+    return
+  end
+
+  self.hooks["SetItemRef"](link, text, button)
+end
+
+function sepgp:OnItemRefSetHyperlink(link)
+  print(">>> ItemRefTooltip:SetHyperlink", link)
+
+  if not link then return end
+  if not string.find(link, "shootybid") then return end
+
+  local bidType
+  local parts = {}
+
+  for part in string.gfind(link, "[^:]+") do
+    table.insert(parts, part)
+  end
+
+  bidType = parts[2]
+  print(">>> BID TYPE:", bidType)
+
+  if not bidType then return end
+
+  local msg
+  if bidType == "1" then
+    msg = "MS"
+  elseif bidType == "2" then
+    msg = "OS"
+  else
+    return
+  end
+
+  print(">>> BID CLICK:", msg)
+
+  if GetNumRaidMembers() > 0 then
+    SendAddonMessage("SEPGP_BID", msg, "RAID")
+  else
+    SendAddonMessage("SEPGP_BID", msg, "PARTY")
+  end
+end
+
+function sepgp:captureAddonBid(event, prefix, message, channel, sender)
+  print(">>> ADDON BID RECEIVED:", prefix, message, channel, sender)
+
+  if prefix ~= "SEPGP_BID" then return end
+  if not running_bid then return end
+  if not (IsRaidLeader() or self:lootMaster()) then return end
+  if not self:inRaid(sender) then return end
+  if bids_blacklist[sender] then return end
+
+  local spec
+  if message == "MS" then
+    spec = "+"
+  elseif message == "OS" then
+    spec = "-"
+  else
+    return
+  end
+
+  -- WYKORZYSTUJEMY ISTNIEJ¥C¥ LOGIKÊ
+  self:captureBid(spec, sender)
+end
+
 
 -- GLOBALS: sepgp_saychannel,sepgp_groupbyclass,sepgp_groupbyarmor,sepgp_groupbyrole,sepgp_raidonly,sepgp_decay,sepgp_minep,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount,sepgp_altspool,sepgp_altpercent,sepgp_log,sepgp_dbver,sepgp_looted,sepgp_debug,sepgp_fubar
 -- GLOBALS: sepgp,sepgp_prices,sepgp_standings,sepgp_bids,sepgp_loot,sepgp_reserves,sepgp_alts,sepgp_logs
